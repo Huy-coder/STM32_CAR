@@ -46,7 +46,8 @@ UART_HandleTypeDef huart4;
 
 /* USER CODE BEGIN PV */
 uint8_t rx_data;
-uint8_t tx_data[20]="STM32 Hello Man!!\r\n";
+uint8_t tx_data[]="TOUCH";
+uint8_t velocity = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -105,6 +106,7 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 	  HAL_UART_RxCpltCallback(&huart4);
+
   }
   /* USER CODE END 3 */
 }
@@ -326,6 +328,10 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
   }
 }
 
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
+
+}
+
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_PIN) {
 	switch(GPIO_PIN) {
 	case GPIO_PIN_10:
@@ -343,6 +349,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_PIN) {
 	default:
 		break;
 	}
+	HAL_UART_Transmit_IT(&huart4, velocity, strlen((char*)velocity));
 }
 /* USER CODE END 4 */
 
