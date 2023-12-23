@@ -55,10 +55,14 @@ uint8_t tx_data_touch_sensor_1[] = "1";
 uint8_t tx_data_touch_sensor_2[] = "2";
 uint8_t tx_data_touch_sensor_3[] = "3";
 uint8_t tx_data_touch_sensor_4[] = "4";
+uint8_t counter_data[] = "v";
 uint8_t velocity = 0;
 uint8_t flag = 0;
 uint8_t sensor_slot = 1;
 volatile uint32_t tim4_count = 0, direction;
+uint32_t count = 0;
+int speed = 0;
+int16_t position;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -120,7 +124,8 @@ int main(void)
   HAL_TIM_Base_Start(&htim3);
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
-  HAL_TIM_Encoder_Start(&htim4, TIM_CHANNEL_ALL);
+  HAL_TIM_Base_Start_IT(&htim4);
+  //HAL_TIM_Encoder_Start(&htim4, TIM_CHANNEL_ALL);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -130,9 +135,12 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	  HAL_TIM_Base_Start_IT(&htim4);
 	HAL_UART_RxCpltCallback(&huart4);
-	tim4_count = htim4.Instance->CNT;
-	direction = !(__HAL_TIM_IS_TIM_COUNTING_DOWN(&htim4));
+	if(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_4) == 1) {
+		count++;
+	}
+	HAL_TIM_Base_Stop_IT(&htim4);
   }
   /* USER CODE END 3 */
 }
@@ -306,28 +314,28 @@ static void MX_TIM4_Init(void)
 
   /* USER CODE END TIM4_Init 0 */
 
-  TIM_Encoder_InitTypeDef sConfig = {0};
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
   TIM_MasterConfigTypeDef sMasterConfig = {0};
 
   /* USER CODE BEGIN TIM4_Init 1 */
 
   /* USER CODE END TIM4_Init 1 */
   htim4.Instance = TIM4;
-  htim4.Init.Prescaler = 0;
+  htim4.Init.Prescaler = 10000;
   htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim4.Init.Period = 0xffff;
+  htim4.Init.Period = 8400;
   htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
-  sConfig.EncoderMode = TIM_ENCODERMODE_TI12;
-  sConfig.IC1Polarity = TIM_ICPOLARITY_RISING;
-  sConfig.IC1Selection = TIM_ICSELECTION_DIRECTTI;
-  sConfig.IC1Prescaler = TIM_ICPSC_DIV1;
-  sConfig.IC1Filter = 10;
-  sConfig.IC2Polarity = TIM_ICPOLARITY_RISING;
-  sConfig.IC2Selection = TIM_ICSELECTION_DIRECTTI;
-  sConfig.IC2Prescaler = TIM_ICPSC_DIV1;
-  sConfig.IC2Filter = 0;
-  if (HAL_TIM_Encoder_Init(&htim4, &sConfig) != HAL_OK)
+  if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim4, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_OnePulse_Init(&htim4, TIM_OPMODE_SINGLE) != HAL_OK)
   {
     Error_Handler();
   }
@@ -491,7 +499,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_PIN) {
 	switch(GPIO_PIN) {
 	case GPIO_PIN_10:
-		HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, 1);
+		//HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, 1);
 		flag = 1;
 		sensor_slot = 1;
 		break;
@@ -528,6 +536,27 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_PIN) {
 		flag = 0;
 	}
 
+}
+
+//void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
+//	tim4_count = __HAL_TIM_GET_COUNTER(htim);
+//
+//	count = (int16_t)tim4_count;
+//
+//	position = count/4;
+//}
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
+{
+	if(htim->Instance == htim4.Instance)
+	 {
+		HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12);
+		count = count / 20;
+		velocity = 6 * 2 * 3.14 * count;
+		counter_data[1] = velocity;
+		HAL_UART_Transmit_IT(&huart4, counter_data, strlen((char*)counter_data));
+		count = 0;
+	 }
 }
 
 
